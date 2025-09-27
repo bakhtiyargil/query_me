@@ -1,0 +1,65 @@
+-------Oracle scan types------------------------------
+INDEX UNIQUE SCAN
+The INDEX UNIQUE SCAN performs the tree traversal only.
+The Oracle database uses this operation if a unique constraint ensures that the search criteria will match no more than one entry.
+
+INDEX RANGE SCAN
+The INDEX RANGE SCAN performs the tree traversal and follows the leaf node chain to find all matching entries.
+This is the fallback operation if multiple entries could possibly match the search criteria.
+
+TABLE ACCESS BY INDEX ROWID
+The TABLE ACCESS BY INDEX ROWID operation retrieves the row from the table.
+This operation is (often) performed for every matched record from a preceding index scan operation.
+
+Order of columns in index creation is important. (employee_id, subsidiary_id) It works well when your search criteria
+contains employee_id first.
+
+----------------The Query Optimizer----------------------
+Cost-based optimizers (CBO) generate many execution plan variations and calculate a cost value for each plan.
+The cost calculation is based on the operations in use and the estimated row numbers.
+In the end the cost value serves as the benchmark for picking the “best” execution plan.
+
+Rule-based optimizers (RBO) generate the execution plan using a hard-coded rule set.
+
+-------------------FBI(Function based index)-------------------
+To support that query, we need an index that covers the actual search term.
+That means we do not need an index on LAST_NAME but on UPPER(LAST_NAME):
+
+CREATE INDEX emp_up_name
+    ON employees (UPPER(last_name))
+An index whose definition contains functions or expressions is a so-called function-based index (FBI).
+Instead of copying the column data directly into the index, a function-based index applies the function first and
+puts the result into the index. As a result, the index stores the names in all caps notation.
+
+**WARN** Sometimes ORM tools use UPPER and LOWER without the developer’s knowledge. Hibernate, for example,
+injects an implicit LOWER for case-insensitive searches.
+
+How can it fetch 100 rows from the table if the preceding index scan returned only 40 rows? The answer is that it can not.
+Contradicting estimates like this often indicate problems with the statistics.
+In this particular case it is because the Oracle database does not update the table statistics when creating a new index.
+
+The Oracle database maintains the information about the number of distinct column values as part of the table statistics.
+These figures are reused if a column is part of multiple indexes.
+
+Statistics for a function-based index (FBI) are also kept on table level as virtual columns.
+Although the Oracle database collects the index statistics for new indexes automatically (since release 10g),
+it does not update the table statistics. For this reason, the Oracle documentation recommends updating the table
+statistics after creating a function-based index:
+
+After creating a function-based index, collect statistics on both the index and its base table using the DBMS_STATS package.
+Such statistics will enable Oracle Database to correctly decide when to use the index.
+----------------------------Deterministic function based index only------------------------
+The query lists all 42-year-old employees. Using a function-based index is an obvious idea for optimizing this query,
+but you cannot use the function GET_AGE in an index definition because it is not deterministic. That means the result
+of the function call is not fully determined by its parameters. Only functions that always return the same result for
+the same parameters—functions that are deterministic—can be indexed.
+
+The reason behind this limitation is simple. When inserting a new row, the database calls the function and stores
+the result in the index and there it stays, unchanged. There is no periodic process that updates the index.
+The database updates the indexed age only when the date of birth is changed by an update statement.
+After the next birthday, the age that is stored in the index will be wrong.
+
+Besides being deterministic, PostgreSQL and the Oracle database require functions to be declared to be deterministic
+when used in an index so you have to use the keyword DETERMINISTIC (Oracle) or IMMUTABLE (PostgreSQL).
+
+Credits: https://use-the-index-luke.com
