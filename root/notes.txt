@@ -61,5 +61,27 @@ After the next birthday, the age that is stored in the index will be wrong.
 
 Besides being deterministic, PostgreSQL and the Oracle database require functions to be declared to be deterministic
 when used in an index so you have to use the keyword DETERMINISTIC (Oracle) or IMMUTABLE (PostgreSQL).
+----------------------------Bind parameters------------------------
+When using bind parameters you do not write the actual values but instead insert placeholders into the SQL statement.
+That way the statements do not change when executing them with different values.
+
+The cost of the TABLE ACCESS BY INDEX ROWID operation is highly sensitive to the row count estimate.
+Selecting ten times as many rows will elevate the cost value by that factor. The overall cost using the index is then
+even higher than a full table scan. The optimizer will therefore select the other execution plan for the bigger subsidiary.
+
+When using bind parameters, the optimizer has no concrete values available to determine their frequency.
+It then just assumes an equal distribution and always gets the same row count estimates and cost values.
+In the end, it will always select the same execution plan.
+
+Tip
+Column histograms are most useful if the values are not uniformly distributed.
+
+Deciding to build a specialized or generic execution plan presents a dilemma for the database. Either effort is taken to
+evaluate all possible plan variants for each execution in order to always get the best execution plan or the optimization
+overhead is saved and a cached execution plan is used whenever possible—accepting the risk of using a suboptimal
+execution plan. The quandary is that the database does not know if the full optimization cycle delivers a different
+execution plan without actually doing the full optimization. Database vendors try to solve this dilemma with heuristic
+methods—but with very limited success.
+
 
 Credits: https://use-the-index-luke.com
