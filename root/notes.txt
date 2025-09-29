@@ -82,6 +82,38 @@ overhead is saved and a cached execution plan is used whenever possible—accept
 execution plan. The quandary is that the database does not know if the full optimization cycle delivers a different
 execution plan without actually doing the full optimization. Database vendors try to solve this dilemma with heuristic
 methods—but with very limited success.
+----------------------------Range scan------------------------
+The biggest performance risk of an INDEX RANGE SCAN is the leaf node traversal. It is therefore the golden rule of
+indexing to keep the scanned index range as small as possible.
+An index on DATE_OF_BIRTH is only scanned in the specified range. The scan starts at the first date and ends at the second.
+
+Of course an ideal index has to cover both columns, but the question is in which order?
+The index on DATE_OF_BIRTH and SUBSIDIARY_ID - not optimal.
+
+The index is ordered by birth dates first. Only if two employees were born on the same day is the SUBSIDIARY_ID used to
+sort these records. The query, however, covers a date range. The ordering of SUBSIDIARY_ID is therefore useless during
+tree traversal.
+The picture looks entirely different when reversing the column order.
+Rule of thumb: index for equality first—then for ranges.
+The access predicates are the start and stop conditions for an index lookup. They define the scanned index range.
+Index filter predicates are applied during the leaf node traversal only. They do not narrow the scanned index range.
+-------------------------Like and Wild card-------------------------
+The following example uses the % wild card in the middle of the search term:
+SELECT first_name, last_name, date_of_birth
+  FROM employees
+ WHERE UPPER(last_name) LIKE 'WIN%D'
+
+LIKE filters can only use the characters before the first wild card during tree traversal. The remaining characters are
+just filter predicates that do not narrow the scanned index range. A single LIKE expression can therefore contain two
+predicate types: (1) the part before the first wild card as an access predicate;
+(2) the other characters as a filter predicate.
+
+Only the part before the first wild card serves as an access predicate.
+The remaining characters do not narrow the scanned index range—non-matching entries are just left out of the result.
+Avoid LIKE expressions with leading wildcards (e.g., '%TERM').
+
+How can you index a LIKE search that has only one wild card at the beginning of the search term ('%TERM')?
+- Answer: Reverse column value
 
 
 Credits: https://use-the-index-luke.com
