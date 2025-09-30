@@ -115,5 +115,33 @@ Avoid LIKE expressions with leading wildcards (e.g., '%TERM').
 How can you index a LIKE search that has only one wild card at the beginning of the search term ('%TERM')?
 - Answer: Reverse column value
 
+-------------------------Index Merge - Combining Multiple Indexes-------------------------
+Nevertheless there are queries where a single index cannot do a perfect job, no matter how you define the index; e.g.,
+queries with two or more independent range conditions as in the following example:
+
+SELECT first_name, last_name, date_of_birth
+  FROM employees
+ WHERE UPPER(last_name) < ?
+   AND date_of_birth <?
+It is impossible to define a B-tree index that would support this query without filter predicates.
+For an explanation, you need to remember that an index is a linked list.
+
+
+-------------------------Partial Indexes - Indexing Selected Rows-------------------------
+We can optimize this query with a two-column index. Considering this query only, the column order does not matter
+because there is no range condition.
+CREATE INDEX messages_todo
+          ON messages (receiver, processed)
+
+The index fulfills its purpose, but it includes many rows that are never searched, namely all the messages that
+were already processed. Due to the logarithmic scalability the index nevertheless makes the query very fast even
+though it wastes a lot of disk space.
+
+With partial indexing you can limit the index to include only the unprocessed messages.
+The syntax for this is surprisingly simple: a where clause.
+CREATE INDEX messages_todo
+          ON messages (receiver)
+       WHERE processed = 'N'
+
 
 Credits: https://use-the-index-luke.com
