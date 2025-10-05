@@ -210,5 +210,37 @@ SELECT *
  WHERE date_of_birth IS NULL
    AND blackbox(employee_id) IS NOT NULL;
 
+The strange way the Oracle database handles NULL in indexes can be used to emulate partial indexes.
+For that, we just have to use NULL for rows that should not be indexed.
+
+To demonstrate, we emulate the following partial index:
+
+CREATE INDEX messages_todo
+          ON messages (receiver)
+       WHERE processed = 'N'
+First, we need a function that returns the RECEIVER value only if the PROCESSED value is 'N'.
+
+CREATE OR REPLACE
+FUNCTION pi_processed(processed CHAR, receiver NUMBER)
+RETURN NUMBER
+DETERMINISTIC
+AS BEGIN
+   IF processed IN ('N') THEN
+      RETURN receiver;
+   ELSE
+      RETURN NULL;
+   END IF;
+END
+
+Now we can create an index that contains only the rows having PROCESSED='N'.
+
+CREATE INDEX messages_todo
+          ON messages (pi_processed(processed, receiver))
+To use the index, you must use the indexed expression in the query:
+
+SELECT message
+  FROM messages
+ WHERE pi_processed(processed, receiver) = ?
+
 
 Credits: https://use-the-index-luke.com
