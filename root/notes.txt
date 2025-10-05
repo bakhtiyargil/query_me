@@ -174,7 +174,7 @@ We can extend this concept for the original query to find all records where DATE
 
 Alternatively, we can use a constant expression that can never be NULL. That makes sure the index has all rows—even if DATE_OF_BIRTH is NULL.
 
-DROP   INDEX emp_dob
+DROP INDEX emp_dob
 CREATE INDEX emp_dob ON employees (date_of_birth, 'X')
 Technically, this index is a function-based index. This example also disproves the myth that the Oracle database cannot index NULL.
 
@@ -194,6 +194,21 @@ SELECT *
  WHERE date_of_birth IS NULL
 
 Besides NOT NULL constraints, the database also knows that constant expressions like in the previous section cannot become NULL.
+
+CREATE INDEX emp_dob_bb
+    ON employees (date_of_birth, blackbox(employee_id))
+
+The function name BLACKBOX emphasizes the fact that the optimizer has no idea what the function does
+(see “Case-Insensitive Search Using UPPER or LOWER”). We can see that the function passes the input value straight through,
+but for the database it is just a function that returns a number. The NOT NULL property of the parameter is lost.
+Although the index must have all rows, the database does not know that so it cannot use the index for the query.
+
+If you know that the function never returns NULL, as in this example, you can change the query to reflect that:
+
+SELECT *
+  FROM employees
+ WHERE date_of_birth IS NULL
+   AND blackbox(employee_id) IS NOT NULL;
 
 
 Credits: https://use-the-index-luke.com
